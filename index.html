@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>แผนผังถังดับเพลิง</title>
+  <style>
+    .map-container {
+      position: relative;
+      width: 800px;   /* ปรับตามสัดส่วนรูป */
+      height: 600px;
+      background-image: url('Lay out AMB2.jpg'); /* ใช้รูปเดียวกับ AppSheet */
+      background-size: cover;
+      border: 1px solid #ccc;
+    }
+    .marker {
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      background-color: red;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>แผนผังถังดับเพลิง</h2>
+  <div class="map-container" id="map"></div>
+<script>
+  const SHEET_ID = "18YbWGcRIHhxv40v_7NTXQUNL3mV9jnNQrjfcUOvQEQs";
+  const SHEET_NAME = "Zone AMB2"; // เช่น "ตำแหน่งถังดับเพลิง"
+
+  const jsonUrl = `https://docs.google.com/spreadsheets/d/${18YbWGcRIHhxv40v_7NTXQUNL3mV9jnNQrjfcUOvQEQs}/gviz/tq?sheet=${encodeURIComponent(Zone AMB2)}&tqx=out:json`;
+
+  fetch(jsonUrl)
+    .then(res => res.text())
+    .then(text => {
+      // ตัด prefix "/*O_o*/" ของ Google ออก
+      const json = JSON.parse(text.substr(47).slice(0, -2));
+      const rows = json.table.rows;
+      const map = document.getElementById("map");
+
+      rows.forEach(row => {
+        // คอลัมน์ 3 (index 2) = ชื่อถัง
+        const name = row.c[2] ? row.c[2].v : "";
+        // คอลัมน์ 12 (index 11) = พิกัด XY
+        const xyString = row.c[11] ? row.c[11].v : "";
+        if (!xyString) return;
+
+        const [x, y] = xyString.split(",").map(n => parseFloat(n));
+
+        const marker = document.createElement("div");
+        marker.className = "marker";
+        marker.style.left = (x * 100) + "%";
+        marker.style.top = (y * 100) + "%";
+        marker.title = name;
+        map.appendChild(marker);
+      });
+    })
+    .catch(err => console.error(err));
+</script>
+</body>
+</html>
