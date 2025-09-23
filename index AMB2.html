@@ -6,9 +6,9 @@
   <style>
     .map-container {
       position: relative;
-      width: 876px;   /* ปรับขนาดตามรูป */
+      width: 876px;
       height: 598px;
-      background-image: url('Lay out AMB2.jpg'); /* ใส่ชื่อรูปของคุณ */
+      background-image: url('Lay out AMB2.jpg'); /* ชื่อไฟล์ภาพพื้นหลัง */
       background-size: cover;
       border: 1px solid #ccc;
     }
@@ -27,58 +27,86 @@
   <h2>แผนผังถังดับเพลิง</h2>
   <div class="map-container" id="map"></div>
 
-<script>
-const SHEET_ID = "18YbWGcRIHhxv40v_7NTXQUNL3mV9jnNQrjfcUOvQEQs";
-const SHEET_NAME = "Zone AMB2";
+  <script>
+    const SHEET_ID = "18YbWGcRIHhxv40v_7NTXQUNL3mV9jnNQrjfcUOvQEQs";
+    const SHEET_NAME = "Zone AMB2";
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
 
-const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+    fetch(csvUrl)
+      .then(res => res.text())
+      .then(text => {
+        const rows = text.trim().split("\n");
 
-fetch(csvUrl)
-  .then(res => res.text())
-  .then(text => {
-    console.log("CSV:", text);
-    const rows = text.trim().split("\n");
-    const map = document.getElementById("map");
-    const data = rows.map(r => r.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g));
+        const data = rows.map((r, i) => {
+          try {
+            return r.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+          } catch (err) {
+            console.warn(`แถวที่ ${i} ผิดพลาด:`, r);
+            return null;
+          }
+        }).filter(Boolean);
 
-    let coords = [];
-    data.slice(1).forEach(row => {
-      const xyString = row[11] ? row[11].replace(/(^"|"$)/g,"") : "";
-      if (!xyString) return;
-      const [x, y] = xyString.split(",").map(n => parseFloat(n.trim()));
-      coords.push({x, y});
-    });
+        console.log("ข้อมูลที่โหลดได้ทั้งหมด", data.length - 1, "แถว (ไม่รวม header)");
 
-    if (coords.length === 0) {
-      console.warn("ไม่มีพิกัด");
-      return;
-    }
+        const coords = [];
 
-    const minX = Math.min(...coords.map(c=>c.x));
-    const maxX = Math.max(...coords.map(c=>c.x));
-    const minY = Math.min(...coords.map(c=>c.y));
-    const maxY = Math.max(...coords.map(c=>c.y));
+        // เก็บพิกัดเพื่อหาขอบเขต
+        data.slice(1).forEach((row, i) => {
+          if (!row || row.length < 12 || !row[11]) return;
 
-    data.slice(1).forEach(row => {
-      const name = row[2] ? row[2].replace(/(^"|"$)/g,"") : "";
-      const xyString = row[11] ? row[11].replace(/(^"|"$)/g,"") : "";
-      if (!xyString) return;
-      const [x, y] = xyString.split(",").map(n=>parseFloat(n.trim()));
-      console.log("Name:", name, "X:", x, "Y:", y);
+          const xyString = row[11].replace(/(^"|"$)/g, "");
+          if (!xyString.includes(",")) return;
 
-      const leftPercent = (x - minX)/(maxX - minX)*100;
-      const topPercent  = (y - minY)/(maxY - minY)*100;
+          const [xStr, yStr] = xyString.split(",");
+          const x = parseFloat(xStr.trim());
+          const y = parseFloat(yStr.trim());
 
-      const marker = document.createElement("div");
-      marker.className = "marker";
-      marker.style.left = leftPercent + "%";
-      marker.style.top  = topPercent + "%";
-      marker.title = name;
-      map.appendChild(marker);
-    });
-  })
-  .catch(err => console.error("โหลดข้อมูลไม่สำเร็จ:", err));
-</script>
+          if (isNaN(x) || isNaN(y)) {
+            console.warn(`พิกัดไม่ถูกต้องที่แถว ${i + 2}:`, row[11]);
+            return;
+          }
+
+          coords.push({ x, y });
+        });
+
+        if (coords.length === 0) {
+          console.warn("ไม่มีพิกัดให้แสดง");
+          return;
+        }
+
+        const minX = Math.min(...coords.map(c => c.x));
+        const maxX = Math.max(...coords.map(c => c.x));
+        const minY = Math.min(...coords.map(c => c.y));
+        const maxY = Math.max(...coords.map(c => c.y));
+
+        const map = document.getElementById("map");
+
+        // วาด marker
+        data.slice(1).forEach((row, i) => {
+          if (!row || row.length < 12 || !row[11]) return;
+
+          const name = row[2] ? row[2].replace(/(^"|"$)/g, "") : "";
+          const xyString = row[11].replace(/(^"|"$)/g, "");
+          if (!xyString.includes(",")) return;
+
+          const [xStr, yStr] = xyString.split(",");
+          const x = parseFloat(xStr.trim());
+          const y = parseFloat(yStr.trim());
+
+          if (isNaN(x) || isNaN(y)) return;
+
+          const leftPercent = ((x - minX) / (maxX - minX)) * 100;
+          const topPercent = ((y - minY) / (maxY - minY)) * 100;
+
+          const marker = document.createElement("div");
+          marker.className = "marker";
+          marker.style.left = leftPercent + "%";
+          marker.style.top = topPercent + "%";
+          marker.title = name;
+          map.appendChild(marker);
+        });
+      })
+      .catch(err => console.error("โหลดข้อมูลไม่สำเร็จ:", err));
+  </script>
 </body>
 </html>
-
